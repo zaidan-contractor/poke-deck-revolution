@@ -9,7 +9,7 @@ Please read these guidelines carefully to ensure a smooth contribution process.
 ## 🏛️ Project Governance & Maintainer Model
 
 - **Community Participation**: Anyone is welcome to open an issue or submit a pull request.
-- **Maintainer Authority**: The project is led by the **Founder & Lead Maintainer** (`@FOUNDER_GITHUB_USERNAME`) along with official maintainers.
+- **Maintainer Authority**: The project is led by the **Founder & Lead Maintainer** (`@zaidan-contractor`) along with official maintainers.
 - **Write Access**: Direct write access to repository branches is reserved for official maintainers. Contributors submit contributions via forks and pull requests.
 - **Review Process**: All pull requests require review and approval by a maintainer before being merged into the `main` branch. Maintainers evaluate submissions for code quality, architectural consistency, security, and game balance.
 
