@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon Card Battle Simulator</title>
+  <meta name="description" content="Scan your physical Pokémon cards and battle GBA Fire Red style!">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <!-- ═══════════════════════════════════════ -->
+  <!--            TITLE SCREEN                -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="title-screen" class="screen active">
+    <div class="title-bg">
+      <div class="stars" id="stars-container"></div>
+      <div class="title-content">
+        <div class="title-logo">
+          <div class="title-pokeball"></div>
+          <h1 class="title-text">
+            <span class="title-pokemon">POKéMON</span>
+            <span class="title-sub">CARD BATTLE</span>
+          </h1>
+          <p class="title-tagline">Scan your cards. Battle GBA style.</p>
+        </div>
+        <div class="title-menu" id="title-menu">
+          <button class="menu-item" data-action="scanner" id="btn-new-game">
+            <span class="menu-arrow">▶</span> SCAN CARDS
+          </button>
+          <button class="menu-item" data-action="collection" id="btn-collection">
+            <span class="menu-arrow">▶</span> COLLECTION
+          </button>
+          <button class="menu-item" data-action="battle-setup" id="btn-battle">
+            <span class="menu-arrow">▶</span> BATTLE!
+          </button>
+        </div>
+        <p class="title-version">v1.0</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--           SCANNER HUB                  -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="scanner-hub" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="scanner-back">◀ BACK</button>
+        <h2>CARD SCANNER</h2>
+      </div>
+      <div class="scanner-hub-content">
+        <p class="scanner-instructions">How do you want to scan your cards?</p>
+        <div class="scan-methods">
+          <button class="scan-method-card" id="btn-scan-phone" data-method="phone">
+            <div class="scan-method-icon">📱</div>
+            <div class="scan-method-name">PHONE CAMERA</div>
+            <div class="scan-method-desc">Best quality! Scan QR to connect</div>
+            <div class="scan-method-badge">RECOMMENDED</div>
+          </button>
+          <button class="scan-method-card" id="btn-scan-webcam" data-method="webcam">
+            <div class="scan-method-icon">💻</div>
+            <div class="scan-method-name">LAPTOP WEBCAM</div>
+            <div class="scan-method-desc">Quick & convenient</div>
+          </button>
+          <button class="scan-method-card" id="btn-scan-manual" data-method="manual">
+            <div class="scan-method-icon">⌨️</div>
+            <div class="scan-method-name">SEARCH MANUALLY</div>
+            <div class="scan-method-desc">Type name & find your card</div>
+          </button>
+        </div>
+        <div class="player-selector">
+          <span>Scanning for:</span>
+          <button class="player-btn active" data-player="1" id="btn-player1">PLAYER 1</button>
+          <button class="player-btn" data-player="2" id="btn-player2">PLAYER 2</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--          PHONE QR CONNECT              -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="phone-connect" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="phone-connect-back">◀ BACK</button>
+        <h2>CONNECT PHONE</h2>
+      </div>
+      <div class="qr-connect-content">
+        <div class="qr-container">
+          <div id="qr-code" class="qr-box">
+            <img id="qr-img" alt="QR Code" style="display:none; width: 230px; height: 230px; image-rendering: pixelated; border-radius: 6px;" />
+            <div id="qr-loading-spinner" class="qr-spinner">⚡ Generating QR code...</div>
+          </div>
+          <div class="qr-pulse"></div>
+        </div>
+        <p class="qr-instruction">Scan this QR code with your phone camera</p>
+        <div class="qr-url-box">
+          <a class="qr-url" id="qr-url" target="_blank" rel="noopener"></a>
+          <button class="btn-copy" id="btn-copy-url">📋 COPY</button>
+        </div>
+        <div class="ip-selector-wrap" id="ip-selector-wrap" style="display:none">
+          <label for="ip-select">Network IP:</label>
+          <select id="ip-select"></select>
+        </div>
+        <div class="connection-status" id="connection-status">
+          <span class="status-dot"></span>
+          <span class="status-text">Waiting for phone...</span>
+        </div>
+        <p class="qr-hint">💡 Laptop and phone must be on the same Wi-Fi network</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--          WEBCAM SCANNER                -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="webcam-scanner" class="screen">
+    <div class="screen-frame scanner-full">
+      <div class="screen-header">
+        <button class="btn-back" id="webcam-back">◀ BACK</button>
+        <h2>SCAN CARD</h2>
+        <span class="scan-player-label" id="scan-player-label">P1</span>
+      </div>
+      <div class="webcam-container">
+        <video id="webcam-video" autoplay playsinline muted></video>
+        <canvas id="webcam-canvas" style="display:none"></canvas>
+        <div class="scan-overlay">
+          <div class="scan-frame" id="scan-frame-box">
+            <div class="scan-corner tl"></div>
+            <div class="scan-corner tr"></div>
+            <div class="scan-corner bl"></div>
+            <div class="scan-corner br"></div>
+            <div class="scan-line" id="scan-line"></div>
+          </div>
+          <p class="scan-hint">Hold card in frame & click SNAP</p>
+        </div>
+      </div>
+      <div class="scanner-controls">
+        <button class="btn-gba btn-scan" id="btn-capture">📸 SNAP CARD</button>
+        <label class="btn-gba btn-upload" id="btn-upload-label" title="Upload a photo from your computer">
+          📁 UPLOAD PHOTO
+          <input type="file" id="webcam-file-input" accept="image/*" style="display:none">
+        </label>
+        <button class="btn-gba btn-flip" id="btn-flip-cam" title="Switch between front and back camera">🔄 FLIP</button>
+      </div>
+      <div class="ocr-status" id="ocr-status" style="display:none">
+        <div class="ocr-spinner"></div>
+        <span id="ocr-status-text">Reading card...</span>
+      </div>
+
+      <!-- Quick Finder Dock right inside webcam view -->
+      <div class="webcam-finder-dock" id="webcam-finder-dock">
+        <div class="dock-header">
+          <span class="dock-title">🔍 QUICK CARD FINDER</span>
+          <span class="dock-sub">Type name or collector number if camera is blurry</span>
+        </div>
+        <div class="dock-search-row">
+          <input type="text" id="dock-search-input" placeholder="e.g. Charizard, Pikachu 025/165..." autocomplete="off">
+          <button class="btn-gba btn-dock-search" id="btn-dock-search">FIND</button>
+        </div>
+        <div class="dock-quick-tags">
+          <button class="dock-tag" data-name="Charizard">🔥 Charizard</button>
+          <button class="dock-tag" data-name="Pikachu">⚡ Pikachu</button>
+          <button class="dock-tag" data-name="Mewtwo">🔮 Mewtwo</button>
+          <button class="dock-tag" data-name="Rayquaza">🐉 Rayquaza</button>
+          <button class="dock-tag" data-name="Lucario">👊 Lucario</button>
+          <button class="dock-tag" data-name="Gengar">🌑 Gengar</button>
+          <button class="dock-tag" data-name="Blastoise">💧 Blastoise</button>
+        </div>
+        <div class="dock-results" id="dock-results"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--         MANUAL SEARCH                  -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="manual-search" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="manual-back">◀ BACK</button>
+        <h2>FIND YOUR CARD</h2>
+      </div>
+      <div class="search-content">
+        <div class="search-bar">
+          <input type="text" id="search-input" placeholder="Type Pokémon name..." class="gba-input" autocomplete="off">
+          <button class="btn-gba" id="btn-search">🔍 SEARCH</button>
+        </div>
+        <div class="search-results" id="search-results">
+          <p class="search-placeholder">Search for a Pokémon to see all card versions</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--        CARD CONFIRMATION               -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="card-confirm" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="confirm-back">◀ BACK</button>
+        <h2>IS THIS YOUR CARD?</h2>
+      </div>
+      <div class="confirm-content">
+        <div class="confirm-cards" id="confirm-cards">
+          <!-- Filled dynamically -->
+        </div>
+        <div class="confirm-single" id="confirm-single" style="display:none">
+          <div class="confirm-card-display">
+            <img id="confirm-card-img" src="" alt="Card">
+          </div>
+          <div class="confirm-card-stats" id="confirm-card-stats"></div>
+          <div class="confirm-actions">
+            <button class="btn-gba btn-yes" id="btn-confirm-yes">✅ YES! That's mine!</button>
+            <button class="btn-gba" id="btn-confirm-edit" style="background:#4b1f87; border-color:#9f5bf5; color:#fff;">✏️ TWEAK DETAILS</button>
+            <button class="btn-gba btn-no" id="btn-confirm-no">❌ Not this one</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--       DIGITIZATION ANIMATION           -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="digitize-screen" class="screen">
+    <div class="digitize-container">
+      <canvas id="digitize-canvas"></canvas>
+      <div class="digitize-card" id="digitize-card" style="display:none">
+        <img id="digitize-card-img" src="" alt="">
+      </div>
+      <div class="digitize-result" id="digitize-result" style="display:none">
+        <div class="digitize-result-card">
+          <img id="result-card-img" src="" alt="">
+        </div>
+        <div class="digitize-result-stats" id="result-stats"></div>
+        <button class="btn-gba" id="btn-scan-another">SCAN ANOTHER</button>
+        <button class="btn-gba" id="btn-done-scanning">DONE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--           COLLECTION                   -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="collection-screen" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="collection-back">◀ BACK</button>
+        <h2>COLLECTION</h2>
+      </div>
+      <div class="collection-content">
+        <div class="collection-tabs">
+          <button class="col-tab active" data-tab="p1" id="col-tab-p1">PLAYER 1 (<span id="p1-count">0</span>)</button>
+          <button class="col-tab" data-tab="p2" id="col-tab-p2">PLAYER 2 (<span id="p2-count">0</span>)</button>
+        </div>
+        <div class="collection-filters">
+          <button class="filter-btn active" data-filter="all">ALL</button>
+          <button class="filter-btn" data-filter="regular">REGULAR</button>
+          <button class="filter-btn" data-filter="ex">EX/ex</button>
+          <button class="filter-btn" data-filter="gx">GX</button>
+          <button class="filter-btn" data-filter="v">V/VMAX/VSTAR</button>
+          <button class="filter-btn" data-filter="fanart">⭐ FAN-ART</button>
+        </div>
+        <div class="collection-grid" id="collection-grid">
+          <p class="empty-collection">No cards yet! Go scan some cards first.</p>
+        </div>
+        <div class="collection-actions">
+          <button class="btn-gba" id="btn-go-scan">📸 SCAN MORE</button>
+          <button class="btn-gba" id="btn-go-battle">⚔️ BATTLE!</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--          BATTLE SETUP                  -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="battle-setup" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="setup-back">◀ BACK</button>
+        <h2>BATTLE SETUP</h2>
+      </div>
+      <div class="setup-content">
+        <h3 class="setup-label">SELECT BATTLE MODE</h3>
+        <div class="mode-cards">
+          <button class="mode-card" data-mode="quick" id="mode-quick">
+            <div class="mode-icon">🏃</div>
+            <div class="mode-name">QUICK BATTLE</div>
+            <div class="mode-desc">3 Pokémon • 2 Prizes</div>
+            <div class="mode-detail">Fast & fun!</div>
+          </button>
+          <button class="mode-card selected" data-mode="standard" id="mode-standard">
+            <div class="mode-icon">⚔️</div>
+            <div class="mode-name">STANDARD</div>
+            <div class="mode-desc">6 Pokémon • 4 Prizes</div>
+            <div class="mode-detail">Classic rules</div>
+          </button>
+          <button class="mode-card" data-mode="boss" id="mode-boss">
+            <div class="mode-icon">👑</div>
+            <div class="mode-name">BOSS BATTLE</div>
+            <div class="mode-desc">1 Pokémon • No prizes</div>
+            <div class="mode-detail">Last one standing!</div>
+          </button>
+          <button class="mode-card" data-mode="draft" id="mode-draft">
+            <div class="mode-icon">🏆</div>
+            <div class="mode-name">DRAFT</div>
+            <div class="mode-desc">4 Pokémon • 3 Prizes</div>
+            <div class="mode-detail">Pick from pool</div>
+          </button>
+        </div>
+        <button class="btn-gba btn-big" id="btn-start-team-select">PICK YOUR TEAMS ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--          TEAM SELECT                   -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="team-select" class="screen">
+    <div class="screen-frame">
+      <div class="screen-header">
+        <button class="btn-back" id="team-back">◀ BACK</button>
+        <h2 id="team-select-title">PLAYER 1 — PICK YOUR TEAM</h2>
+      </div>
+      <div class="team-content">
+        <div class="team-slots" id="team-slots">
+          <!-- filled dynamically -->
+        </div>
+        <div class="team-available" id="team-available">
+          <!-- filled dynamically -->
+        </div>
+        <div class="team-actions">
+          <button class="btn-gba btn-big" id="btn-team-confirm" disabled>CONFIRM TEAM</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--         COIN FLIP                      -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="coin-flip" class="screen">
+    <div class="coin-flip-container">
+      <h2 class="coin-title">WHO GOES FIRST?</h2>
+      <div class="coin" id="coin">
+        <div class="coin-face coin-heads">P1</div>
+        <div class="coin-face coin-tails">P2</div>
+      </div>
+      <p class="coin-result" id="coin-result"></p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--          BATTLE ARENA                  -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="battle-arena" class="screen">
+    <div class="battle-container">
+      <!-- Battle background -->
+      <div class="battle-bg">
+        <div class="battle-bg-sky"></div>
+        <div class="battle-bg-ground"></div>
+      </div>
+
+      <!-- Opponent (top) -->
+      <div class="battle-opponent-area">
+        <div class="battle-info-box opponent-info" id="opponent-info">
+          <div class="info-name-row">
+            <span class="poke-name" id="opp-name">???</span>
+            <span class="poke-badge" id="opp-badge"></span>
+            <span class="poke-level" id="opp-level"></span>
+          </div>
+          <div class="hp-bar-container">
+            <span class="hp-label">HP</span>
+            <div class="hp-bar-bg">
+              <div class="hp-bar-fill" id="opp-hp-bar" style="width:100%"></div>
+            </div>
+          </div>
+          <div class="hp-text" id="opp-hp-text">150/150</div>
+          <div class="status-icons" id="opp-status"></div>
+        </div>
+        <div class="battle-sprite opponent-sprite" id="opp-sprite">
+          <img id="opp-sprite-img" src="" alt="">
+        </div>
+      </div>
+
+      <!-- Player (bottom) -->
+      <div class="battle-player-area">
+        <div class="battle-sprite player-sprite" id="player-sprite">
+          <img id="player-sprite-img" src="" alt="">
+        </div>
+        <div class="battle-info-box player-info" id="player-info">
+          <div class="info-name-row">
+            <span class="poke-name" id="player-name">???</span>
+            <span class="poke-badge" id="player-badge"></span>
+          </div>
+          <div class="hp-bar-container">
+            <span class="hp-label">HP</span>
+            <div class="hp-bar-bg">
+              <div class="hp-bar-fill" id="player-hp-bar" style="width:100%"></div>
+            </div>
+          </div>
+          <div class="hp-text" id="player-hp-text">120/120</div>
+          <div class="energy-display" id="player-energy"></div>
+          <div class="status-icons" id="player-status"></div>
+        </div>
+      </div>
+
+      <!-- Prize cards display -->
+      <div class="prize-display">
+        <div class="prize-p1" id="prize-p1">
+          <span class="prize-label">P1</span>
+          <div class="prize-cards" id="prize-cards-p1"></div>
+        </div>
+        <div class="prize-p2" id="prize-p2">
+          <span class="prize-label">P2</span>
+          <div class="prize-cards" id="prize-cards-p2"></div>
+        </div>
+      </div>
+
+      <!-- Battle text box (GBA style) -->
+      <div class="battle-textbox" id="battle-textbox">
+        <div class="textbox-inner">
+          <p class="battle-text" id="battle-text">What will PIKACHU do?</p>
+          <span class="text-arrow" id="text-arrow">▼</span>
+        </div>
+      </div>
+
+      <!-- Action menu (GBA style) -->
+      <div class="battle-menu" id="battle-menu" style="display:none">
+        <div class="menu-textbox">
+          <p class="menu-prompt" id="menu-prompt">What will PIKACHU do?</p>
+        </div>
+        <div class="menu-options">
+          <button class="menu-btn" id="btn-fight">FIGHT</button>
+          <button class="menu-btn" id="btn-pokemon">POKéMON</button>
+          <button class="menu-btn" id="btn-bag">BAG</button>
+          <button class="menu-btn" id="btn-run">RUN</button>
+        </div>
+      </div>
+
+      <!-- Move selection -->
+      <div class="move-menu" id="move-menu" style="display:none">
+        <div class="move-list" id="move-list">
+          <!-- filled dynamically -->
+        </div>
+        <div class="move-info" id="move-info">
+          <div class="move-type-display" id="move-type-display"></div>
+          <div class="move-pp" id="move-pp"></div>
+        </div>
+        <button class="btn-gba btn-small move-cancel" id="move-cancel">◀ BACK</button>
+      </div>
+
+      <!-- Pokemon switch menu -->
+      <div class="switch-menu" id="switch-menu" style="display:none">
+        <div class="screen-header">
+          <button class="btn-back" id="switch-back">◀ BACK</button>
+          <h2>CHOOSE A POKéMON</h2>
+        </div>
+        <div class="switch-list" id="switch-list">
+          <!-- filled dynamically -->
+        </div>
+      </div>
+
+      <!-- Attack animation overlay -->
+      <div class="attack-overlay" id="attack-overlay" style="display:none">
+        <div class="attack-flash" id="attack-flash"></div>
+        <div class="attack-name-display" id="attack-name-display"></div>
+      </div>
+
+      <!-- Coin flip for effects -->
+      <div class="effect-coin-overlay" id="effect-coin-overlay" style="display:none">
+        <div class="effect-coin" id="effect-coin">
+          <div class="coin-face coin-heads">H</div>
+          <div class="coin-face coin-tails">T</div>
+        </div>
+        <p class="effect-coin-result" id="effect-coin-result"></p>
+      </div>
+
+      <!-- GX / VSTAR power prompt -->
+      <div class="power-prompt" id="power-prompt" style="display:none">
+        <div class="power-prompt-box">
+          <p class="power-prompt-text" id="power-prompt-text"></p>
+          <p class="power-prompt-warning">⚠️ You can only use this ONCE per game!</p>
+          <div class="power-prompt-actions">
+            <button class="btn-gba btn-yes" id="power-yes">USE IT!</button>
+            <button class="btn-gba btn-no" id="power-no">CANCEL</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn indicator -->
+      <div class="turn-indicator" id="turn-indicator" style="display:none">
+        <span class="turn-text" id="turn-text">YOUR TURN</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--         VICTORY SCREEN                 -->
+  <!-- ═══════════════════════════════════════ -->
+  <section id="victory-screen" class="screen">
+    <div class="victory-container">
+      <div class="victory-flash"></div>
+      <h1 class="victory-title" id="victory-title">🏆 PLAYER 1 WINS! 🏆</h1>
+      <div class="victory-stats" id="victory-stats">
+        <!-- filled dynamically -->
+      </div>
+      <div class="victory-actions">
+        <button class="btn-gba btn-big" id="btn-rematch">⚔️ REMATCH</button>
+        <button class="btn-gba" id="btn-back-title">🏠 TITLE SCREEN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--           GLOBAL OVERLAY               -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="loading-pokeball">
+      <div class="pokeball-spin"></div>
+    </div>
+    <p class="loading-text" id="loading-text">Loading...</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!--       CARD TWEAKER / EDITOR MODAL          -->
+  <!-- ═══════════════════════════════════════ -->
+  <div id="modal-card-editor" class="modal-overlay" style="display:none;">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3>✏️ CUSTOMIZE / TWEAK CARD</h3>
+        <button class="modal-close" id="btn-close-card-editor">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:8px; color:var(--text-gold); margin-bottom:12px; line-height: 1.5;">
+          ⭐ Customize attacks, HP, damage, and energy costs to match your physical fan-art card perfectly!
+        </p>
+        <div class="editor-grid">
+          <div class="editor-field">
+            <label>Card Name:</label>
+            <input type="text" id="edit-card-name" class="editor-input">
+          </div>
+          <div class="editor-field">
+            <label>HP:</label>
+            <input type="number" id="edit-card-hp" class="editor-input">
+          </div>
+          <div class="editor-field">
+            <label>Card Type / Rule:</label>
+            <select id="edit-card-type" class="editor-input">
+              <option value="regular">Regular (1 Prize)</option>
+              <option value="gx">GX (2 Prizes)</option>
+              <option value="ex-lower">ex (2 Prizes)</option>
+              <option value="ex-upper">EX (2 Prizes)</option>
+              <option value="v">V (2 Prizes)</option>
+              <option value="vmax">VMAX (3 Prizes)</option>
+              <option value="vstar">VSTAR (2 Prizes)</option>
+            </select>
+          </div>
+          <div class="editor-field">
+            <label>Primary Type:</label>
+            <select id="edit-primary-type" class="editor-input">
+              <option value="Metal">Metal</option>
+              <option value="Psychic">Psychic</option>
+              <option value="Fire">Fire</option>
+              <option value="Water">Water</option>
+              <option value="Grass">Grass</option>
+              <option value="Lightning">Lightning</option>
+              <option value="Fighting">Fighting</option>
+              <option value="Darkness">Darkness</option>
+              <option value="Dragon">Dragon</option>
+              <option value="Colorless">Colorless</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; border-top:1px solid #2a2a4a; padding-top:10px;">
+          <h4 style="font-size:8px; color:#00f0ff; margin-bottom:8px; font-family:var(--font-pixel);">ATTACK 1</h4>
+          <div class="editor-grid">
+            <div class="editor-field">
+              <label>Attack Name:</label>
+              <input type="text" id="edit-atk1-name" class="editor-input">
+            </div>
+            <div class="editor-field">
+              <label>Damage:</label>
+              <input type="number" id="edit-atk1-dmg" class="editor-input">
+            </div>
+            <div class="editor-field" style="grid-column: span 2;">
+              <label>Energy Cost (e.g. Metal, Colorless):</label>
+              <input type="text" id="edit-atk1-cost" class="editor-input">
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; border-top:1px solid #2a2a4a; padding-top:10px;">
+          <h4 style="font-size:8px; color:#ff007f; margin-bottom:8px; font-family:var(--font-pixel);">ATTACK 2 / GX MOVE</h4>
+          <div class="editor-grid">
+            <div class="editor-field">
+              <label>Attack Name:</label>
+              <input type="text" id="edit-atk2-name" class="editor-input">
+            </div>
+            <div class="editor-field">
+              <label>Damage:</label>
+              <input type="number" id="edit-atk2-dmg" class="editor-input">
+            </div>
+            <div class="editor-field" style="grid-column: span 2;">
+              <label>Energy Cost (e.g. Metal, Metal, Colorless):</label>
+              <input type="text" id="edit-atk2-cost" class="editor-input">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gba btn-yes" id="btn-save-card-edit">💾 SAVE & ADD TO COLLECTION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/cards-data.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/collection.js"></script>
+  <script src="/js/scanner.js"></script>
+  <script src="/js/battle.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

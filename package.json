@@ -1,0 +1,16 @@
+{
+  "name": "pokemon-card-battle",
+  "version": "1.0.0",
+  "description": "Pokémon Card Battle Simulator - Scan physical cards, battle GBA Fire Red style",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5",
+    "tesseract.js": "^7.0.0"
+  }
+}

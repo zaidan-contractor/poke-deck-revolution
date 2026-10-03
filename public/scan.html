@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pokémon Card Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #080816;
+      --card-bg: #101026;
+      --primary: #ffd700;
+      --accent: #00f0ff;
+      --success: #48d848;
+      --danger: #ff4757;
+      --font-pixel: 'Press Start 2P', monospace;
+      --font-ui: 'Outfit', sans-serif;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg-dark);
+      color: #f0f0f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══ Header ═══ */
+    .header {
+      padding: 12px 16px;
+      background: linear-gradient(180deg, #18183c, #0d0d22);
+      border-bottom: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .header-title {
+      font-family: var(--font-pixel);
+      font-size: 10px;
+      color: var(--primary);
+      text-shadow: 0 0 10px rgba(255,215,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-pixel);
+      font-size: 7px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid #333;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #888;
+      animation: pulseDot 1.5s infinite;
+    }
+    .status-badge.connected .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-badge.connected { color: var(--success); border-color: rgba(72,216,72,0.4); }
+    .status-badge.disconnected .status-dot { background: var(--danger); }
+    .status-badge.disconnected { color: var(--danger); }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.8); }
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    /* ═══ Main Container ═══ */
+    .container {
+      flex: 1;
+      padding: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ═══ Hero Scanner Viewport ═══ */
+    .scanner-hero {
+      background: linear-gradient(180deg, #131332, #0b0b1c);
+      border: 2px solid #29295c;
+      border-radius: 16px;
+      padding: 20px 16px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    .scanner-hero::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%; width: 200%; height: 200%;
+      background: radial-gradient(circle, rgba(0,240,255,0.06) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* Target Reticle Card Frame */
+    .viewfinder {
+      width: 220px;
+      height: 308px; /* Authentic 2.5 : 3.5 Pokémon card ratio */
+      margin: 0 auto 16px;
+      border: 2px dashed rgba(255,215,0,0.4);
+      border-radius: 14px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8,8,22,0.7);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .viewfinder:hover, .viewfinder:active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(0,240,255,0.25);
+    }
+
+    /* Holographic corner markers */
+    .vf-corner {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: var(--primary);
+      border-style: solid;
+      pointer-events: none;
+    }
+    .vf-tl { top: 6px; left: 6px; border-width: 3px 0 0 3px; border-top-left-radius: 6px; }
+    .vf-tr { top: 6px; right: 6px; border-width: 3px 3px 0 0; border-top-right-radius: 6px; }
+    .vf-bl { bottom: 6px; left: 6px; border-width: 0 0 3px 3px; border-bottom-left-radius: 6px; }
+    .vf-br { bottom: 6px; right: 6px; border-width: 0 3px 3px 0; border-bottom-right-radius: 6px; }
+
+    /* Laser Sweep Animation */
+    .laser-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent), #fff, var(--accent), transparent);
+      box-shadow: 0 0 12px var(--accent), 0 0 20px var(--accent);
+      top: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .viewfinder.scanning .laser-line {
+      opacity: 1;
+      animation: laserSweep 1.8s ease-in-out infinite alternate;
+    }
+    @keyframes laserSweep {
+      0% { top: 5%; }
+      100% { top: 95%; }
+    }
+
+    .vf-preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      border-radius: 12px;
+    }
+
+    .vf-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+    }
+    .vf-icon {
+      font-size: 44px;
+      animation: floatCam 2.5s ease-in-out infinite;
+    }
+    @keyframes floatCam {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .vf-hint {
+      font-family: var(--font-pixel);
+      font-size: 8px;
+      color: var(--primary);
+      line-height: 1.6;
+    }
+    .vf-sub {
+      font-size: 11px;
+      color: #8c8cb8;
+      font-weight: 600;
+    }
+
+    /* ═══ Action Buttons ═══ */
+    .btn-snap-main {
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      width: 100%;
+      padding: 16px 20px;
+      background: linear-gradient(180deg, #ffd700, #e6a800);
+      color: #0b0b1c;
+      border: 3px solid #fff275;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 6px 24px rgba(255,215,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.15s;
+    }
+    .btn-snap-main:active {
+      transform: scale(0.97);
+      box-shadow: 0 2px 10px rgba(255,215,0,0.2);
+    }
+    .btn-snap-main:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .upload-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .btn-secondary {
+      flex: 1;
+      font-family: var(--font-pixel);
+      font-size: 7px;
+      padding: 10px;
+      background: #1c1c3f;
+      color: #c4c4e8;
+      border: 1px solid #3d3d75;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .btn-secondary:active { background: #28285a; }
+
+    /* ═══ Scanning HUD & Status ═══ */
+    .scanning-hud {
+      display: none;
+      margin-top: 14px;
+      padding: 12px;
+      background: rgba(0,240,255,0.08);
+      border: 1px solid rgba(0,240,255,0.3);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .scanning-hud.active { display: block; }
+    .scanning-hud .hud-title {
+      font-family: var(--font-pixel);
+      font-size: 8px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .scanning-hud .hud-detail {
+      font-size: 11px;
+      color: #c4c4e8;
+    }
+    .hud-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(0,240,255,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      display: inline-block;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ═══ Result Presentation Card ═══ */
+    .result-section {
+      display: none;
+      animation: slideUp 0.3s ease-out;
+    }
+    .result-section.show { display: block; }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .success-card {
+      background: linear-gradient(180deg, #102618, #0a170f);
+      border: 2px solid var(--success);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 30px rgba(72,216,72,0.25);
+    }
+    .success-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .success-badge-tag {
+      font-family: var(--font-pixel);
+      font-size: 8px;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .laptop-glow-indicator {
+      font-size: 10px;
+      color: #98ff98;
+      font-weight: 700;
+    }
+
+    .matched-card-view {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      background: rgba(0,0,0,0.4);
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(72,216,72,0.25);
+    }
+    .matched-card-img {
+      width: 75px;
+      height: 105px;
+      object-fit: cover;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      flex-shrink: 0;
+    }
+    .matched-card-details {
+      flex: 1;
+      font-size: 12px;
+    }
+    .matched-name {
+      font-family: var(--font-pixel);
+      font-size: 10px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .matched-meta {
+      color: var(--primary);
+      font-weight: 700;
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+    .matched-attacks {
+      color: #b0c4de;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .laptop-prompt {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(72,216,72,0.12);
+      border-radius: 8px;
+      text-align: center;
+      font-size: 12px;
+      color: #98ff98;
+      font-weight: 600;
+    }
+
+    /* ═══ Multiple Candidates Section ═══ */
+    .candidates-section {
+      margin-top: 14px;
+    }
+    .candidates-title {
+      font-family: var(--font-pixel);
+      font-size: 7px;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .countdown-pill {
+      background: #252554;
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 6px;
+    }
+    .candidates-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .candidate-card {
+      background: #141433;
+      border: 2px solid #2f2f63;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .candidate-card.active {
+      border-color: var(--success);
+      box-shadow: 0 0 15px rgba(72,216,72,0.5);
+    }
+    .candidate-card:active { transform: scale(0.95); }
+    .candidate-card img {
+      width: 100%;
+      aspect-ratio: 2.5/3.5;
+      object-fit: cover;
+      display: block;
+    }
+    .candidate-card .card-info {
+      padding: 4px;
+      background: #0a0a1a;
+      font-size: 8px;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .candidate-card .c-name {
+      color: var(--primary);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .candidate-card .c-sub {
+      color: #888;
+      font-size: 7px;
+    }
+    .candidate-badge {
+      position: absolute;
+      top: 3px; right: 3px;
+      background: var(--success);
+      color: #000;
+      font-size: 6px;
+      font-family: var(--font-pixel);
+      padding: 1px 4px;
+      border-radius: 3px;
+      display: none;
+    }
+    .candidate-card.active .candidate-badge { display: block; }
+
+    /* ═══ Manual Search Accordion (Backup) ═══ */
+    .manual-accordion {
+      background: #0e0e22;
+      border: 1px solid #23234d;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      padding: 10px 14px;
+      font-family: var(--font-pixel);
+      font-size: 7px;
+      color: #8888b5;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-body {
+      display: none;
+      padding: 12px;
+      border-top: 1px solid #1a1a3a;
+    }
+    .accordion-body.open { display: block; }
+    .manual-search-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .manual-input {
+      flex: 1;
+      padding: 10px;
+      background: #060612;
+      border: 1px solid #333366;
+      border-radius: 6px;
+      color: #fff;
+      font-family: var(--font-ui);
+      font-size: 13px;
+    }
+    .btn-manual-go {
+      font-family: var(--font-pixel);
+      font-size: 8px;
+      padding: 10px 14px;
+      background: var(--primary);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .quick-pills {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .quick-pill {
+      font-size: 10px;
+      background: #171736;
+      border: 1px solid #2e2e5c;
+      padding: 4px 8px;
+      border-radius: 12px;
+      color: #c4c4e8;
+      cursor: pointer;
+    }
+
+    /* ═══ Settings Drawer ═══ */
+    .settings-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .settings-modal.open { display: flex; }
+    .settings-box {
+      background: #141433;
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 380px;
+      width: 100%;
+    }
+    .settings-box h3 {
+      font-family: var(--font-pixel);
+      font-size: 9px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .settings-box p {
+      font-size: 11px;
+      color: #b0c4de;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .settings-input {
+      width: 100%;
+      padding: 10px;
+      background: #0a0a1a;
+      border: 1px solid #3d3d75;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .settings-btn-save {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #000;
+      font-family: var(--font-pixel);
+      font-size: 8px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .settings-btn-close {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      background: transparent;
+      color: #888;
+      border: none;
+      font-size: 11px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">
+      <span>⚡</span> POKÉDEX SCANNER
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div class="status-badge disconnected" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">CONNECTING</span>
+      </div>
+      <button class="btn-icon" id="btn-open-settings" title="Scanner Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- AI Mode Banner -->
+  <div class="ai-banner" id="ai-banner" style="background:#141433; border-bottom:1px solid #2f2f63; padding:8px 14px; display:flex; align-items:center; gap:8px;">
+    <span class="ai-pill" id="ai-pill" style="font-family:var(--font-pixel); font-size:6px; padding:3px 6px; border-radius:4px; background:#ffaa00; color:#000; white-space:nowrap;">LOCAL OCR</span>
+    <span id="ai-banner-text" style="flex:1; font-size:10px; color:#ddd;">💡 For 100% Google Lens accuracy, enable free Gemini AI!</span>
+    <button class="btn-setup" id="btn-quick-setup" style="font-family:var(--font-pixel); font-size:6px; padding:5px 8px; background:var(--accent); color:#000; border:none; border-radius:4px; cursor:pointer;">ENABLE</button>
+  </div>
+
+  <!-- Hidden camera inputs -->
+  <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
+  <input type="file" id="gallery-input" accept="image/*" style="display:none">
+
+  <main class="container">
+
+    <!-- Hero Camera Viewfinder -->
+    <section class="scanner-hero">
+      <div class="viewfinder" id="viewfinder">
+        <div class="vf-corner vf-tl"></div>
+        <div class="vf-corner vf-tr"></div>
+        <div class="vf-corner vf-bl"></div>
+        <div class="vf-corner vf-br"></div>
+        <div class="laser-line"></div>
+
+        <img id="vf-preview-img" class="vf-preview-img" alt="Scanned Card">
+
+        <div class="vf-placeholder" id="vf-placeholder">
+          <div class="vf-icon">📸</div>
+          <div class="vf-hint">ALIGN CARD IN FRAME</div>
+          <div class="vf-sub">Tap button below to snap!</div>
+        </div>
+      </div>
+
+      <!-- Main Action Button -->
+      <button class="btn-snap-main" id="btn-snap">
+        <span>📸 SCAN POKÉMON CARD</span>
+      </button>
+
+      <div class="upload-row">
+        <button class="btn-secondary" id="btn-gallery">📁 CHOOSE FROM PHOTOS</button>
+      </div>
+
+      <!-- Scanning HUD / Feedback -->
+      <div class="scanning-hud" id="scanning-hud">
+        <div class="hud-title">
+          <span class="hud-spinner"></span>
+          <span id="hud-status">ANALYZING CARD...</span>
+        </div>
+        <div class="hud-detail" id="hud-detail">Reading Pokémon name & stats...</div>
+      </div>
+    </section>
+
+    <!-- Scan Result Section (Delivered to Laptop) -->
+    <section class="result-section" id="result-section">
+      <div class="success-card">
+        <div class="success-header">
+          <div class="success-badge-tag">
+            <span>✨</span>
+            <span id="result-badge-text">SENT TO LAPTOP SCREEN!</span>
+          </div>
+          <div class="laptop-glow-indicator">📺 LAPTOP UPDATED</div>
+        </div>
+
+        <div class="matched-card-view">
+          <img id="res-card-img" class="matched-card-img" src="" alt="Card Artwork">
+          <div class="matched-card-details">
+            <div class="matched-name" id="res-card-name">Charizard ex</div>
+            <div class="matched-meta" id="res-card-meta">HP 330 • Obsidian Flames #125/197</div>
+            <div class="matched-attacks" id="res-card-attacks">Burning Darkness — 180+ dmg</div>
+          </div>
+        </div>
+
+        <div class="laptop-prompt">
+          ✅ Digitize animation started on your laptop screen!
+        </div>
+
+        <!-- Multiple Candidates / Alternate Versions -->
+        <div class="candidates-section" id="candidates-section" style="display:none">
+          <div class="candidates-title">
+            <span id="candidates-heading">ALTERNATE VERSIONS (TAP TO SWITCH):</span>
+            <span class="countdown-pill" id="countdown-pill" style="display:none">AUTO-SENT #1</span>
+          </div>
+          <div class="candidates-grid" id="candidates-grid"></div>
+        </div>
+
+        <button class="btn-snap-main" id="btn-scan-again" style="margin-top:14px; background:linear-gradient(180deg, #48d848, #28a828); border-color:#68f868;">
+          <span>📸 SCAN ANOTHER CARD</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Backup Manual Search (Accordion) -->
+    <section class="manual-accordion">
+      <div class="accordion-header" id="acc-header">
+        <span>🔍 BACKUP SEARCH (IF CAMERA BLURRY)</span>
+        <span id="acc-arrow">▼</span>
+      </div>
+      <div class="accordion-body" id="acc-body">
+        <div class="manual-search-row">
+          <input type="text" id="manual-query" class="manual-input" placeholder="e.g. Charizard, Pikachu 025/165...">
+          <button class="btn-manual-go" id="btn-manual-search">FIND</button>
+        </div>
+        <div class="quick-pills">
+          <span class="quick-pill" data-q="Charizard">🔥 Charizard</span>
+          <span class="quick-pill" data-q="Pikachu">⚡ Pikachu</span>
+          <span class="quick-pill" data-q="Mewtwo">🔮 Mewtwo</span>
+          <span class="quick-pill" data-q="Rayquaza">🐉 Rayquaza</span>
+          <span class="quick-pill" data-q="Gengar">🌑 Gengar</span>
+          <span class="quick-pill" data-q="Lucario">👊 Lucario</span>
+        </div>
+        <div id="manual-results-grid" style="margin-top:10px; display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal" id="settings-modal">
+    <div class="settings-box">
+      <h3>⚡ SCANNER ENGINE SETTINGS</h3>
+      <p>
+        <strong>Zero-Quota Protection Active:</strong><br>
+        The scanner runs 100% free with smart local OCR and a 1,025 Pokémon database. No API key is required!
+      </p>
+      <p>
+        Optional: Enter a Gemini API Key to enable AI Vision. If key quota is reached, it seamlessly falls back to local OCR automatically.
+      </p>
+      <input type="password" id="gemini-key-input" class="settings-input" placeholder="AIzaSy... (Optional)">
+      <button class="settings-btn-save" id="btn-save-settings">SAVE SETTINGS</button>
+      <button class="settings-btn-close" id="btn-close-settings">CLOSE</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // ═══════════════════════════════════════════════════════
+    //  SMART CARD SCANNER (Auto-Recognition + Auto-Push)
+    // ═══════════════════════════════════════════════════════
+
+    const socket = io();
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session') || '';
+
+    // --- DOM Elements ---
+    const statusBadge = document.getElementById('status-badge');
+    const statusText = document.getElementById('status-text');
+    const cameraInput = document.getElementById('camera-input');
+    const galleryInput = document.getElementById('gallery-input');
+    const btnSnap = document.getElementById('btn-snap');
+    const btnGallery = document.getElementById('btn-gallery');
+    const viewfinder = document.getElementById('viewfinder');
+    const vfPreview = document.getElementById('vf-preview-img');
+    const vfPlaceholder = document.getElementById('vf-placeholder');
+    const scanningHud = document.getElementById('scanning-hud');
+    const hudStatus = document.getElementById('hud-status');
+    const hudDetail = document.getElementById('hud-detail');
+    const resultSection = document.getElementById('result-section');
+    const resCardImg = document.getElementById('res-card-img');
+    const resCardName = document.getElementById('res-card-name');
+    const resCardMeta = document.getElementById('res-card-meta');
+    const resCardAttacks = document.getElementById('res-card-attacks');
+    const candidatesSection = document.getElementById('candidates-section');
+    const candidatesGrid = document.getElementById('candidates-grid');
+    const candidatesHeading = document.getElementById('candidates-heading');
+    const btnScanAgain = document.getElementById('btn-scan-again');
+
+    // Settings Modal
+    const settingsModal = document.getElementById('settings-modal');
+    const btnOpenSettings = document.getElementById('btn-open-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const btnSaveSettings = document.getElementById('btn-save-settings');
+    const geminiKeyInput = document.getElementById('gemini-key-input');
+
+    // Accordion
+    const accHeader = document.getElementById('acc-header');
+    const accBody = document.getElementById('acc-body');
+    const accArrow = document.getElementById('acc-arrow');
+    const manualQuery = document.getElementById('manual-query');
+    const btnManualSearch = document.getElementById('btn-manual-search');
+    const manualResultsGrid = document.getElementById('manual-results-grid');
+
+    // --- State ---
+    let currentCandidates = [];
+    let activeCard = null;
+    let countdownTimer = null;
+
+    // Load saved API key if present
+    geminiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+
+    // ═══ Socket Session ═══
+    function handleConnect() {
+      if (sessionId) {
+        socket.emit('join-scan-session', sessionId);
+        statusBadge.className = 'status-badge connected';
+        statusText.textContent = 'CONNECTED';
+      } else {
+        statusBadge.className = 'status-badge connected';
+        statusText.textContent = 'DIRECT';
+      }
+    }
+    socket.on('connect', handleConnect);
+    socket.on('reconnect', handleConnect);
+    socket.on('disconnect', () => {
+      statusBadge.className = 'status-badge disconnected';
+      statusText.textContent = 'OFFLINE';
+    });
+
+    // Process image: generate full image, plus high-contrast header and footer crops
+    function processCardImages(dataUrl, callback) {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        const maxDim = 800;
+
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+
+        // 1. Full downscaled card image
+        const canvasFull = document.createElement('canvas');
+        canvasFull.width = w;
+        canvasFull.height = h;
+        const ctxFull = canvasFull.getContext('2d');
+        ctxFull.drawImage(img, 0, 0, w, h);
+        const fullBase64 = canvasFull.toDataURL('image/jpeg', 0.85);
+
+        // 2. Header crop (Top 22% containing Pokémon Name & HP)
+        const headerH = Math.round(h * 0.22);
+        const canvasHeader = document.createElement('canvas');
+        canvasHeader.width = w;
+        canvasHeader.height = headerH;
+        const ctxHeader = canvasHeader.getContext('2d');
+        ctxHeader.drawImage(canvasFull, 0, 0, w, headerH, 0, 0, w, headerH);
+
+        // High contrast boost on header for crisp OCR text
+        try {
+          const imgData = ctxHeader.getImageData(0, 0, w, headerH);
+          const d = imgData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            // Threshold to enhance bold lettering
+            const val = gray > 140 ? 255 : (gray < 70 ? 0 : gray);
+            d[i] = val; d[i + 1] = val; d[i + 2] = val;
+          }
+          ctxHeader.putImageData(imgData, 0, 0);
+        } catch(e) {}
+        const headerBase64 = canvasHeader.toDataURL('image/jpeg', 0.9);
+
+        // 3. Footer crop (Bottom 14% containing Collector & Set Number e.g. 125/197)
+        const footerY = Math.round(h * 0.84);
+        const footerH = h - footerY;
+        const canvasFooter = document.createElement('canvas');
+        canvasFooter.width = w;
+        canvasFooter.height = footerH;
+        const ctxFooter = canvasFooter.getContext('2d');
+        ctxFooter.drawImage(canvasFull, 0, footerY, w, footerH, 0, 0, w, footerH);
+        const footerBase64 = canvasFooter.toDataURL('image/jpeg', 0.9);
+
+        callback({
+          fullImage: fullBase64,
+          headerImage: headerBase64,
+          footerImage: footerBase64
+        });
+      };
+      img.src = dataUrl;
+    }
+
+    // ═══ Camera Triggers ═══
+    btnSnap.addEventListener('click', () => cameraInput.click());
+    viewfinder.addEventListener('click', () => cameraInput.click());
+    btnGallery.addEventListener('click', () => galleryInput.click());
+
+    cameraInput.addEventListener('change', handleFileSelected);
+    galleryInput.addEventListener('change', handleFileSelected);
+
+    function handleFileSelected(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const rawBase64 = ev.target.result;
+        // Show preview in viewfinder
+        vfPreview.src = rawBase64;
+        vfPreview.style.display = 'block';
+        vfPlaceholder.style.display = 'none';
+
+        processCardImages(rawBase64, (processed) => {
+          startCardRecognition(processed);
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ═══ Main Recognition Engine Call ═══
+    async function startCardRecognition(processed) {
+      // 1. UI in scanning state
+      viewfinder.classList.add('scanning');
+      scanningHud.classList.add('active');
+      btnSnap.disabled = true;
+      resultSection.classList.remove('show');
+      clearInterval(countdownTimer);
+
+      hudStatus.textContent = 'ANALYZING CARD...';
+      hudDetail.textContent = 'Reading Pokémon name & stats...';
+
+      const apiKey = localStorage.getItem('gemini_api_key') || '';
+
+      try {
+        const response = await fetch('/api/recognize-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: processed.fullImage,
+            headerImage: processed.headerImage,
+            footerImage: processed.footerImage,
+            sessionId: sessionId,
+            apiKey: apiKey,
+            autoSend: true // Auto-push top match to laptop screen immediately!
+          })
+        });
+
+        const data = await response.json();
+
+        // Stop scanning animations
+        viewfinder.classList.remove('scanning');
+        scanningHud.classList.remove('active');
+        btnSnap.disabled = false;
+
+        if (data.success && (data.exactMatch || (data.candidates && data.candidates.length > 0))) {
+          // Success!
+          if (navigator.vibrate) navigator.vibrate([80, 40, 100]);
+          displayRecognitionResult(data);
+        } else {
+          // No confident match
+          hudStatus.textContent = 'RECOGNITION FAILED';
+          hudDetail.textContent = 'Please hold card steady with good lighting.';
+          scanningHud.classList.add('active');
+          setTimeout(() => scanningHud.classList.remove('active'), 4000);
+        }
+      } catch (err) {
+        console.error('Scan error:', err);
+        viewfinder.classList.remove('scanning');
+        scanningHud.classList.remove('active');
+        btnSnap.disabled = false;
+        alert('Network connection error. Check server WiFi.');
+      }
+    }
+
+    // ═══ Present Result & Candidates ═══
+    function displayRecognitionResult(data) {
+      const topCard = data.exactMatch || data.candidates[0];
+      activeCard = topCard;
+      currentCandidates = data.candidates || [topCard];
+
+      // Fill main card display
+      resCardImg.src = topCard.images?.small || topCard.images?.large || '';
+      if (topCard.isFanArt || topCard.isCustomCard) {
+        resCardName.innerHTML = `${topCard.name} <span style="background:linear-gradient(135deg, #ff007f, #00f0ff); color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:7px; vertical-align:middle; display:inline-block; margin-left:4px;">⭐ FAN-ART</span>`;
+      } else if (topCard.isGoldenCopy) {
+        resCardName.innerHTML = `${topCard.name} <span style="background:linear-gradient(135deg, #FFD700, #FFA500); color:#000; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:7px; vertical-align:middle; display:inline-block; margin-left:4px;">🥇 GOLD COPY</span>`;
+      } else if (topCard.isPhysicalAdapted) {
+        resCardName.innerHTML = `${topCard.name} <span style="background:linear-gradient(135deg, #6366f1, #a855f7); color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:7px; vertical-align:middle; display:inline-block; margin-left:4px;">🔄 ADAPTED</span>`;
+      } else {
+        resCardName.textContent = topCard.name;
+      }
+
+      const setInfo = topCard.set?.name ? `${topCard.set.name} #${topCard.number || '?'}` : `#${topCard.number || '?'}`;
+      resCardMeta.textContent = `HP ${topCard.hp || '?'} • ${topCard.primaryType || topCard.types?.join('/') || 'Colorless'} • ${setInfo}`;
+
+      const attackStr = (topCard.attacks || []).map(a => {
+        const costStr = (a.cost || []).map(c => `[${c}]`).join('');
+        return `${costStr ? costStr + ' ' : ''}${a.name} (${a.damageRaw || a.damage || '—'} dmg)`;
+      }).join(' • ');
+      resCardAttacks.textContent = attackStr || 'No special attacks';
+
+      // Candidates grid (if there are other candidate versions)
+      if (currentCandidates.length > 1) {
+        candidatesSection.style.display = 'block';
+        candidatesHeading.textContent = 'NOT THIS VERSION? TAP YOUR EXACT CARD:';
+        renderCandidatesGrid(currentCandidates, topCard.id);
+      } else {
+        candidatesSection.style.display = 'none';
+      }
+
+      // Show result section and scroll to it
+      resultSection.classList.add('show');
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function renderCandidatesGrid(cards, selectedId) {
+      candidatesGrid.innerHTML = '';
+      cards.forEach(card => {
+        const item = document.createElement('div');
+        item.className = 'candidate-card' + (card.id === selectedId ? ' active' : '');
+        item.innerHTML = `
+          <img src="${card.images?.small || ''}" alt="${card.name}" loading="lazy">
+          <div class="card-info">
+            <div class="c-name">${card.name}</div>
+            <div class="c-sub">#${card.number || '?'} • HP ${card.hp || '?'}</div>
+          </div>
+          <div class="candidate-badge">✓ ACTIVE</div>
+        `;
+
+        item.addEventListener('click', () => {
+          // Switch active card on laptop!
+          switchCardOnLaptop(card);
+          document.querySelectorAll('.candidate-card').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+        });
+
+        candidatesGrid.appendChild(item);
+      });
+    }
+
+    // Push alternate selected candidate to laptop
+    async function switchCardOnLaptop(card) {
+      activeCard = card;
+      resCardImg.src = card.images?.small || card.images?.large || '';
+      resCardName.textContent = card.name;
+      const setInfo = card.set?.name ? `${card.set.name} #${card.number || '?'}` : `#${card.number || '?'}`;
+      resCardMeta.textContent = `HP ${card.hp || '?'} • ${card.primaryType || card.types?.join('/') || 'Colorless'} • ${setInfo}`;
+
+      if (navigator.vibrate) navigator.vibrate(60);
+
+      const payload = {
+        sessionId: sessionId,
+        cardName: card.name,
+        cardId: card.id,
+        cardNumber: card.number || '',
+        cardData: card
+      };
+
+      try {
+        socket.emit('card-scanned-from-phone', payload);
+        await fetch('/api/phone-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {
+        console.warn('Switch card send error:', e);
+      }
+    }
+
+    // ═══ Scan Another Button ═══
+    btnScanAgain.addEventListener('click', () => {
+      resultSection.classList.remove('show');
+      vfPreview.style.display = 'none';
+      vfPlaceholder.style.display = 'flex';
+      cameraInput.value = '';
+      galleryInput.value = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // ═══ Manual Search Backup ═══
+    accHeader.addEventListener('click', () => {
+      const isOpen = accBody.classList.toggle('open');
+      accArrow.textContent = isOpen ? '▲' : '▼';
+    });
+
+    btnManualSearch.addEventListener('click', () => performManualSearch(manualQuery.value.trim()));
+    manualQuery.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') performManualSearch(manualQuery.value.trim());
+    });
+
+    document.querySelectorAll('.quick-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        manualQuery.value = pill.dataset.q;
+        performManualSearch(pill.dataset.q);
+      });
+    });
+
+    async function performManualSearch(q) {
+      if (!q) return;
+      manualResultsGrid.innerHTML = '<div style="grid-column:1/-1; font-size:10px; color:#888; text-align:center; padding:10px;">Searching...</div>';
+
+      try {
+        const resp = await fetch(`/api/pokemon/search?q=${encodeURIComponent('name:"' + q + '"')}&pageSize=6`);
+        const json = await resp.json();
+        const cards = json.data || [];
+
+        if (cards.length === 0) {
+          manualResultsGrid.innerHTML = '<div style="grid-column:1/-1; font-size:10px; color:#888; text-align:center; padding:10px;">No cards found.</div>';
+          return;
+        }
+
+        manualResultsGrid.innerHTML = '';
+        cards.forEach(card => {
+          const div = document.createElement('div');
+          div.className = 'candidate-card';
+          div.innerHTML = `
+            <img src="${card.images?.small || ''}" alt="${card.name}">
+            <div class="card-info">
+              <div class="c-name">${card.name}</div>
+              <div class="c-sub">#${card.number || '?'}</div>
+            </div>
+          `;
+          div.addEventListener('click', () => {
+            switchCardOnLaptop(card);
+            alert(`Sent ${card.name} to laptop!`);
+          });
+          manualResultsGrid.appendChild(div);
+        });
+      } catch (e) {
+        manualResultsGrid.innerHTML = '<div style="grid-column:1/-1; font-size:10px; color:red; text-align:center;">Search failed.</div>';
+      }
+    }
+
+    // ═══ Settings Modal & AI Banner ═══
+    const btnQuickSetup = document.getElementById('btn-quick-setup');
+    const aiPill = document.getElementById('ai-pill');
+    const aiBannerText = document.getElementById('ai-banner-text');
+
+    function updateAIBanner() {
+      const key = localStorage.getItem('gemini_api_key');
+      if (key && key.trim().length > 10) {
+        aiPill.style.background = 'var(--success)';
+        aiPill.textContent = 'GOOGLE AI VISION';
+        aiBannerText.textContent = '🟢 100% Google Lens visual accuracy active!';
+        if (btnQuickSetup) btnQuickSetup.textContent = 'CONFIG';
+      } else {
+        aiPill.style.background = '#ffaa00';
+        aiPill.textContent = 'LOCAL OCR';
+        aiBannerText.textContent = '💡 For 100% Google Lens accuracy, enable free Gemini AI!';
+        if (btnQuickSetup) btnQuickSetup.textContent = 'ENABLE';
+      }
+    }
+
+    if (btnQuickSetup) btnQuickSetup.addEventListener('click', () => settingsModal.classList.add('open'));
+    btnOpenSettings.addEventListener('click', () => settingsModal.classList.add('open'));
+    btnCloseSettings.addEventListener('click', () => settingsModal.classList.remove('open'));
+    btnSaveSettings.addEventListener('click', () => {
+      const key = geminiKeyInput.value.trim();
+      localStorage.setItem('gemini_api_key', key);
+      settingsModal.classList.remove('open');
+      updateAIBanner();
+      alert(key ? '⚡ Google AI Vision Enabled!' : 'Settings saved!');
+    });
+
+    updateAIBanner();
+  </script>
+</body>
+</html>
