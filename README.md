@@ -154,7 +154,7 @@ Poké Deck Revolution is an open-source, community-driven project. We welcome co
 Please read our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
 
 ### Project Governance
-- The project is founded and maintained by the **Lead Maintainer** (`@FOUNDER_GITHUB_USERNAME`).
+- The project is founded and maintained by the **Lead Maintainer** (`@zaidan-contractor`).
 - All code additions enter through Pull Requests submitted to the `main` branch.
 - Maintainers review submissions for code safety, game balance, and architectural consistency before merging.
 - Contributors do not automatically receive direct write or push access to the official repository.
@@ -169,11 +169,19 @@ For responsible vulnerability reporting, please see [SECURITY.md](SECURITY.md).
 
 ---
 
+## 📜 License
+
+Poké Deck Revolution's original source code is licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See the [LICENSE](LICENSE) file for the full license text.
+
+Pokémon-related names, characters, trademarks, card artwork, designs, and other third-party materials are **not** covered by this license and remain the property of their respective owners. Third-party dependencies and services remain subject to their respective licenses and terms.
+
+---
+
 ## ⚖️ Intellectual Property & Fair Use Disclaimer
 
 **Poké Deck Revolution is an unofficial, non-commercial, fan-developed open-source software project.**
 
 - **Trademarks & Copyrights**: Pokémon, Pokémon character names, Pokémon Trading Card Game, card designs, logos, artwork, audio, and game mechanics are trademarks, service marks, and copyrights of **Nintendo**, **Creatures Inc.**, and **GAME FREAK inc.**
 - **Project Scope**: The authors and contributors to this project do not claim ownership of any Pokémon intellectual property, artwork, or card assets.
-- **Original Code**: Original source code authored for Poké Deck Revolution (including the scanning pipeline, classification heuristics, web interface, and server implementation) is intended to be licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
+- **Original Code**: Only original source code authored specifically for Poké Deck Revolution (the scanning pipeline, classification heuristics, web interface, and server implementation) is licensed under GPL-3.0.
 - **Non-Commercial**: This software is developed purely for educational, archival, and non-commercial hobbyist research into computer vision and card simulation. It must not be monetized, sold, or distributed with proprietary assets.
