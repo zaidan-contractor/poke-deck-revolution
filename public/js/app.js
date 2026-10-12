@@ -185,6 +185,11 @@ const App = (() => {
     on('btn-save-card-edit', 'click', () => saveCardEditor());
     on('btn-confirm-no', 'click', () => showScreen('scanner-hub'));
 
+    // Card inspect modal
+    on('btn-close-card-inspect', 'click', () => closeCardInspect());
+    on('btn-inspect-close', 'click', () => closeCardInspect());
+    on('btn-inspect-edit', 'click', () => { closeCardInspect(); openCardEditor(); });
+
     // Digitize screen
     on('btn-scan-another', 'click', () => showScreen('scanner-hub'));
     on('btn-done-scanning', 'click', () => { refreshCollection(); showScreen('collection-screen'); });
@@ -534,6 +539,38 @@ const App = (() => {
     });
   }
 
+  // ── 3D Card Interactive Tilt & Holographic Sheen ──
+  function init3DCardTilt(cardContainer, sheenElement) {
+    if (!cardContainer) return;
+
+    cardContainer.onmousemove = (e) => {
+      const rect = cardContainer.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+
+      const rx = ((y - cy) / cy) * -18;
+      const ry = ((x - cx) / cx) * 18;
+
+      cardContainer.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.03, 1.03, 1.03)`;
+
+      if (sheenElement) {
+        const px = (x / rect.width) * 100;
+        const py = (y / rect.height) * 100;
+        sheenElement.style.opacity = '1';
+        sheenElement.style.background = `radial-gradient(circle at ${px}% ${py}%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 215, 0, 0.35) 30%, rgba(0, 240, 255, 0.3) 55%, transparent 75%)`;
+      }
+    };
+
+    cardContainer.onmouseleave = () => {
+      cardContainer.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      if (sheenElement) {
+        sheenElement.style.opacity = '0';
+      }
+    };
+  }
+
   function showSingleConfirmation(card) {
     selectedCard = card;
     const confirmGrid = document.getElementById('confirm-cards');
@@ -541,38 +578,74 @@ const App = (() => {
     confirmGrid.style.display = 'none';
     confirmSingle.style.display = 'block';
 
-    document.getElementById('confirm-card-img').src = card.images.large || card.images.small;
+    const cardImg = document.getElementById('confirm-card-img');
+    cardImg.src = card.images.large || card.images.small;
+
+    // Attach 3D tilt & holographic sheen
+    const cardDisplay = document.getElementById('confirm-card-display');
+    const cardSheen = document.getElementById('confirm-card-sheen');
+    init3DCardTilt(cardDisplay, cardSheen);
 
     const statsEl = document.getElementById('confirm-card-stats');
     const isFanArt = card.isFanArt || card.isCustomCard;
     const isGoldCopy = card.isGoldenCopy;
     const isAdapted = card.isPhysicalAdapted;
+
     const badgeLabel = isFanArt ? '⭐ FAN-ART' :
                        isGoldCopy ? '🥇 GOLD COPY' :
                        isAdapted ? '🔄 ADAPTED' :
                        Collection.getBadgeLabel(card.cardType);
-    const badgeStyle = isFanArt ? 'background:linear-gradient(135deg,#ff007f,#00f0ff);color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;' :
-                       isGoldCopy ? 'background:linear-gradient(135deg,#FFD700,#FFA500);color:#000;padding:2px 6px;border-radius:4px;font-size:8px;font-weight:bold;' :
-                       isAdapted ? 'background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:2px 6px;border-radius:4px;font-size:8px;' :
-                       'color:var(--text-gold);';
 
-    const attacks = (card.attacks || []).map(a => {
-      const costStr = (a.cost || []).map(c => `[${c}]`).join('');
-      return `${costStr ? `<span style="color:#00f0ff">${costStr}</span> ` : ''}<strong>${a.name}</strong> — ${a.damageRaw || a.damage || '—'} dmg`;
-    }).join('<br>');
+    const badgeClass = isFanArt ? 'badge-fanart' :
+                       isGoldCopy ? 'badge-ex' :
+                       isAdapted ? 'badge-v' :
+                       Collection.getBadgeClass(card.cardType);
 
-    const adaptedLine = isAdapted ? `<br><span style="color:#a855f7;font-size:10px;">Adapted from: ${card.adaptedFrom}</span>` : '';
-    const goldLine = isGoldCopy ? `<br><span style="color:#FFD700;font-size:10px;">Golden counterfeit → showing official card</span>` : '';
+    const typeColor = PokemonAPI.getTypeColor(card.primaryType);
+
+    const attacksHtml = (card.attacks || []).map(a => {
+      const costDots = (a.cost || []).map(c =>
+        `<span class="cost-pip" style="background:${PokemonAPI.getTypeColor(c)}">${c[0]}</span>`
+      ).join('');
+      return `
+        <div class="confirm-atk-card">
+          <div class="confirm-atk-top">
+            <div class="confirm-atk-left">
+              <span class="confirm-atk-cost">${costDots || '<span class="cost-pip">C</span>'}</span>
+              <span class="confirm-atk-name">${a.name}</span>
+            </div>
+            <span class="confirm-atk-dmg">${a.damageRaw || a.damage || '—'}</span>
+          </div>
+          ${a.text ? `<div class="confirm-atk-desc">${a.text}</div>` : ''}
+        </div>
+      `;
+    }).join('');
 
     statsEl.innerHTML = `
-      <strong>${card.name}</strong> ${badgeLabel ? `<span style="${badgeStyle}">[${badgeLabel}]</span>` : ''}<br>
-      HP: ${card.hp} • Type: ${PokemonAPI.getTypeEmoji(card.primaryType)} ${card.primaryType}<br>
-      Set: ${card.set?.name || 'Collection'} • #${card.number || 'Custom'}${adaptedLine}${goldLine}<br>
-      <br>
-      <strong>Attacks:</strong><br>${attacks || 'No special attacks'}<br>
-      ${card.weaknesses && card.weaknesses.length > 0 ? `Weakness: ${card.weaknesses.map(w => w.type + ' ' + (w.value || 'x2')).join(', ')}<br>` : ''}
-      ${card.resistances && card.resistances.length > 0 ? `Resistance: ${card.resistances.map(r => r.type + ' ' + (r.value || '-20')).join(', ')}<br>` : ''}
-      Retreat: ${card.convertedRetreatCost || 2} energy
+      <div class="confirm-meta-header">
+        <div class="confirm-title-row">
+          <h3 class="confirm-poke-name">${card.name}</h3>
+          <span class="confirm-hp-pill">HP ${card.hp}</span>
+        </div>
+        <div class="confirm-badges-row">
+          <span class="confirm-type-badge" style="background:${typeColor};">
+            ${PokemonAPI.getTypeEmoji(card.primaryType)} ${card.primaryType}
+          </span>
+          ${badgeLabel ? `<span class="card-badge ${badgeClass}" style="position:static;display:inline-block;">${badgeLabel}</span>` : ''}
+          <span class="confirm-set-info">${card.set?.name || 'Vault'} #${card.number || 'Custom'}</span>
+        </div>
+      </div>
+
+      <div class="confirm-attacks-container">
+        <div class="confirm-section-label">ATTACKS & ABILITIES</div>
+        ${attacksHtml || '<p style="color:var(--text-dim);font-size:12px;">No special attacks listed.</p>'}
+      </div>
+
+      <div class="confirm-footer-stats">
+        <div>Weakness: <strong>${card.weaknesses && card.weaknesses[0] ? card.weaknesses[0].type + ' ' + (card.weaknesses[0].value || 'x2') : '—'}</strong></div>
+        <div>Resistance: <strong>${card.resistances && card.resistances[0] ? card.resistances[0].type + ' ' + (card.resistances[0].value || '-20') : '—'}</strong></div>
+        <div>Retreat: <strong>${card.convertedRetreatCost || 2}</strong></div>
+      </div>
     `;
 
     showScreen('card-confirm');
@@ -679,111 +752,289 @@ const App = (() => {
     }
   }
 
-  // ── Digitization Animation ──
+  // ── Cinematic Digitization / Summoning Animation ──
   function playDigitizeAnimation(card) {
     showScreen('digitize-screen');
 
     const canvas = document.getElementById('digitize-canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
 
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const centerX = W / 2;
+    const centerY = H / 2;
+
+    const hologramStage = document.getElementById('digitize-hologram-stage');
+    const hologramImg = document.getElementById('digitize-card-img');
+    const scanBeam = document.getElementById('hologram-scan-beam');
+    const flashEl = document.getElementById('digitize-flash');
+    const resultEl = document.getElementById('digitize-result');
+
+    // Reset initial UI states
+    if (resultEl) resultEl.style.display = 'none';
+    if (flashEl) {
+      flashEl.className = 'digitize-flash';
+      flashEl.style.opacity = '0';
+    }
+    if (hologramStage) {
+      hologramStage.style.display = 'flex';
+      hologramStage.style.opacity = '1';
+    }
+    if (hologramImg) {
+      hologramImg.src = card.images.large || card.images.small;
+    }
+
+    const typeColor = PokemonAPI.getTypeColor(card.primaryType) || '#ffd700';
+
+    // Particle swarm
+    const particleCount = 200;
     const particles = [];
-    const typeColor = PokemonAPI.getTypeColor(card.primaryType);
-    const particleCount = 120;
-
-    // Create particles
     for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 50 + Math.random() * 320;
       particles.push({
-        x: canvas.width / 2 + (Math.random() - 0.5) * 200,
-        y: canvas.height / 2 + (Math.random() - 0.5) * 280,
-        vx: (Math.random() - 0.5) * 8,
-        vy: (Math.random() - 0.5) * 8,
+        x: centerX + Math.cos(angle) * dist,
+        y: centerY + Math.sin(angle) * dist,
+        vx: (Math.random() - 0.5) * 12,
+        vy: (Math.random() - 0.5) * 12,
+        angle: angle,
+        dist: dist,
+        speed: 0.04 + Math.random() * 0.05,
         size: 2 + Math.random() * 4,
-        color: typeColor,
-        alpha: 1,
-        phase: 0 // 0=scatter, 1=converge
+        color: Math.random() > 0.3 ? typeColor : (Math.random() > 0.5 ? '#ffd700' : '#00f0ff'),
+        alpha: Math.random() * 0.8 + 0.2
       });
     }
 
     let frame = 0;
-    const totalFrames = 120;
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
+    const totalFrames = 170;
 
     function animate() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, W, H);
       frame++;
 
-      // Phase 1 (0-40): Particles scatter outward
-      // Phase 2 (40-80): Particles converge to center
-      // Phase 3 (80-120): Flash and show result
-
-      if (frame < 40) {
-        // Scatter
-        particles.forEach(p => {
-          p.x += p.vx * 1.5;
-          p.y += p.vy * 1.5;
-          p.alpha = 1;
-          ctx.beginPath();
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.alpha * (1 - frame / 60);
-          ctx.fillRect(p.x, p.y, p.size, p.size);
-        });
-        ctx.globalAlpha = 1;
-      } else if (frame < 80) {
-        // Converge
-        const progress = (frame - 40) / 40;
-        particles.forEach(p => {
-          p.x += (centerX - p.x) * 0.08;
-          p.y += (centerY - p.y) * 0.08;
-          p.alpha = progress;
-          ctx.beginPath();
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.alpha;
-          ctx.fillRect(p.x, p.y, p.size * (1 - progress * 0.5), p.size * (1 - progress * 0.5));
-        });
-
-        // Glow at center
-        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 100 * progress);
-        gradient.addColorStop(0, typeColor + '80');
-        gradient.addColorStop(1, 'transparent');
-        ctx.globalAlpha = progress;
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.globalAlpha = 1;
-      } else if (frame < 90) {
-        // Flash
-        const flashAlpha = 1 - (frame - 80) / 10;
-        ctx.fillStyle = '#fff';
-        ctx.globalAlpha = flashAlpha;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.globalAlpha = 1;
-      } else if (frame >= 90) {
-        // Show result
-        const resultEl = document.getElementById('digitize-result');
-        if (resultEl.style.display === 'none') {
-          resultEl.style.display = 'block';
-          document.getElementById('result-card-img').src = card.images.large || card.images.small;
-          document.getElementById('result-stats').innerHTML = `
-            <strong style="color:var(--text-gold);font-size:11px">${card.name}</strong><br>
-            HP ${card.hp} • ${PokemonAPI.getTypeEmoji(card.primaryType)} ${card.primaryType}<br>
-            ${Collection.getBadgeLabel(card.cardType) ? `[${Collection.getBadgeLabel(card.cardType)}]` : ''} • ${card.set.name}<br>
-            <span style="color:var(--hp-green)">✅ Added to Player ${scanningForPlayer}'s collection!</span>
-          `;
+      if (frame < 55) {
+        // ── Phase 1: Cyber Scan & Particle Burst (0 - 55) ──
+        const progress = frame / 55;
+        if (scanBeam) {
+          scanBeam.style.top = (progress * 100) + '%';
         }
-        return; // Stop animation
+
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+          p.x += p.vx * 0.6;
+          p.y += p.vy * 0.6;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.alpha * (0.3 + progress * 0.7);
+          ctx.fill();
+        });
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (frame < 125) {
+        // ── Phase 2: Concentric Particle Vortex (55 - 125) ──
+        const progress = (frame - 55) / 70;
+
+        // Draw rotating cyber-rings around center
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(frame * 0.03);
+        ctx.strokeStyle = typeColor;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.4 * progress;
+        ctx.beginPath();
+        ctx.arc(0, 0, 160 * (1 - progress * 0.3), 0, Math.PI * 1.5);
+        ctx.stroke();
+
+        ctx.rotate(-frame * 0.05);
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.35 * progress;
+        ctx.beginPath();
+        ctx.arc(0, 0, 110 * (1 - progress * 0.2), 0, Math.PI * 1.2);
+        ctx.stroke();
+        ctx.restore();
+
+        // Vortex particles spiraling into center
+        ctx.globalCompositeOperation = 'lighter';
+        particles.forEach(p => {
+          p.angle += p.speed * 1.5;
+          p.dist *= 0.96;
+          p.x = centerX + Math.cos(p.angle) * p.dist;
+          p.y = centerY + Math.sin(p.angle) * p.dist;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (1 + progress), 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = Math.min(1, p.alpha * (0.8 + progress));
+          ctx.fill();
+        });
+
+        // Center orb bloom
+        const orbGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 120 * progress);
+        orbGrad.addColorStop(0, '#ffffff');
+        orbGrad.addColorStop(0.3, typeColor);
+        orbGrad.addColorStop(1, 'transparent');
+        ctx.globalAlpha = progress * 0.85;
+        ctx.fillStyle = orbGrad;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 120 * progress, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        if (hologramStage) {
+          hologramStage.style.transform = `scale(${1 - progress * 0.4}) rotateY(${frame * 12}deg)`;
+          hologramStage.style.opacity = `${1 - progress * 0.8}`;
+        }
+      } else if (frame < 145) {
+        // ── Phase 3: Supernova Screen Flash (125 - 145) ──
+        if (hologramStage) hologramStage.style.display = 'none';
+
+        if (flashEl) {
+          flashEl.style.opacity = '1';
+          flashEl.style.background = `radial-gradient(circle, #fff 20%, ${typeColor} 60%, transparent 90%)`;
+        }
+
+        const flashFade = 1 - (frame - 125) / 20;
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = flashFade;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalAlpha = 1;
+      } else {
+        // ── Phase 4: Celebration Reveal & Stats Unlock (145+) ──
+        if (flashEl) flashEl.style.opacity = '0';
+
+        if (resultEl && resultEl.style.display === 'none') {
+          resultEl.style.display = 'flex';
+          const resImg = document.getElementById('result-card-img');
+          if (resImg) resImg.src = card.images.large || card.images.small;
+
+          const isFanArt = card.isFanArt || card.isCustomCard;
+          const badgeLabel = isFanArt ? '⭐ FAN-ART' : Collection.getBadgeLabel(card.cardType);
+
+          const statsDiv = document.getElementById('result-stats');
+          statsDiv.innerHTML = `
+            <div class="result-name-banner">${card.name}</div>
+            <div class="result-chips-row">
+              <span class="result-chip type" style="background:${typeColor};">
+                ${PokemonAPI.getTypeEmoji(card.primaryType)} ${card.primaryType}
+              </span>
+              <span class="result-chip hp">HP <span id="counter-hp">0</span></span>
+              ${badgeLabel ? `<span class="result-chip badge">${badgeLabel}</span>` : ''}
+            </div>
+            <div class="result-vault-confirm">
+              <span class="vault-icon">⚡</span> Added to Player ${scanningForPlayer}'s Vault
+            </div>
+          `;
+
+          // Count up HP smoothly
+          let count = 0;
+          const targetHp = card.hp || 100;
+          const step = Math.max(1, Math.floor(targetHp / 20));
+          const hpTimer = setInterval(() => {
+            count = Math.min(targetHp, count + step);
+            const el = document.getElementById('counter-hp');
+            if (el) el.textContent = count;
+            if (count >= targetHp) clearInterval(hpTimer);
+          }, 30);
+
+          // Attach 3D tilt to result card
+          init3DCardTilt(
+            document.getElementById('digitize-result-card'),
+            document.querySelector('#digitize-result-card .card-foil-shine')
+          );
+        }
+
+        // Ambient floating golden sparkle particles in background
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 40; i++) {
+          const t = (frame * 0.02 + i * 0.2);
+          const px = (centerX + Math.sin(t) * (200 + (i % 5) * 40));
+          const py = ((frame * 1.5 + i * 35) % H);
+          ctx.beginPath();
+          ctx.arc(px, py, (i % 3) + 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 === 0 ? '#ffd700' : '#ffffff';
+          ctx.globalAlpha = 0.5 + Math.sin(t) * 0.4;
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
       }
 
-      if (frame < totalFrames) {
+      if (frame < totalFrames + 400) {
         requestAnimationFrame(animate);
       }
     }
 
-    // Hide result initially
-    document.getElementById('digitize-result').style.display = 'none';
     animate();
     updateCollectionCounts();
+  }
+
+  // ─── Card Inspector Modal ───
+  function openCardInspect(card, player) {
+    selectedCard = card;
+    const modal = document.getElementById('modal-card-inspect');
+    if (!modal) return;
+
+    document.getElementById('inspect-header-title').textContent = `🗃️ ${card.name.toUpperCase()} (P${player} VAULT)`;
+    document.getElementById('inspect-card-img').src = card.images.large || card.images.small;
+
+    const isFanArt = card.isFanArt || card.isCustomCard;
+    const badgeLabel = isFanArt ? '⭐ FAN-ART' : Collection.getBadgeLabel(card.cardType);
+
+    const attacksHtml = (card.attacks || []).map(a => {
+      const costPills = (a.cost || []).map(c =>
+        `<span class="cost-pip" style="background:${PokemonAPI.getTypeColor(c)}">${c[0]}</span>`
+      ).join('');
+      return `
+        <div class="inspect-attack-row">
+          <div class="atk-left">
+            <div class="atk-cost">${costPills || '<span class="cost-pip">C</span>'}</div>
+            <strong class="atk-name">${a.name}</strong>
+          </div>
+          <span class="atk-dmg">${a.damageRaw || a.damage || '—'}</span>
+        </div>
+        ${a.text ? `<div class="atk-desc">${a.text}</div>` : ''}
+      `;
+    }).join('');
+
+    document.getElementById('inspect-details').innerHTML = `
+      <div class="inspect-top-row">
+        <div class="inspect-name">${card.name}</div>
+        <div class="inspect-hp">HP ${card.hp}</div>
+      </div>
+      <div class="inspect-type-row">
+        <span class="inspect-type-pill" style="background:${PokemonAPI.getTypeColor(card.primaryType)}">
+          ${PokemonAPI.getTypeEmoji(card.primaryType)} ${card.primaryType}
+        </span>
+        ${badgeLabel ? `<span class="inspect-badge-pill">${badgeLabel}</span>` : ''}
+        <span class="inspect-set-tag">${card.set?.name || 'Standard Vault'} #${card.number || '001'}</span>
+      </div>
+      <div class="inspect-attacks-box">
+        <div class="inspect-section-title">ATTACKS & ABILITIES</div>
+        ${attacksHtml || '<p style="color:var(--text-dim);font-size:12px;">No special attacks.</p>'}
+      </div>
+      <div class="inspect-meta-row">
+        <div>Weakness: <strong>${card.weaknesses && card.weaknesses[0] ? card.weaknesses[0].type + ' ' + (card.weaknesses[0].value || 'x2') : 'None'}</strong></div>
+        <div>Resistance: <strong>${card.resistances && card.resistances[0] ? card.resistances[0].type + ' ' + (card.resistances[0].value || '-20') : 'None'}</strong></div>
+        <div>Retreat: <strong>${card.convertedRetreatCost || 2}</strong></div>
+      </div>
+    `;
+
+    init3DCardTilt(
+      document.getElementById('inspect-3d-card'),
+      document.getElementById('inspect-sheen')
+    );
+
+    modal.style.display = 'flex';
+  }
+
+  function closeCardInspect() {
+    const modal = document.getElementById('modal-card-inspect');
+    if (modal) modal.style.display = 'none';
   }
 
   // ─── Collection ───
@@ -819,12 +1070,16 @@ const App = (() => {
     grid.innerHTML = '';
 
     if (cards.length === 0) {
-      grid.innerHTML = '<p class="empty-collection">No cards found. Go scan some!</p>';
+      grid.innerHTML = '<p class="empty-collection">No cards found in vault. Go scan some cards!</p>';
       return;
     }
 
     cards.forEach(card => {
       const el = Collection.renderCardElement(card, { deletable: true });
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('card-delete')) return;
+        openCardInspect(card, player);
+      });
       el.querySelector('.card-delete')?.addEventListener('click', (e) => {
         e.stopPropagation();
         Collection.removeCard(player, card.id);
@@ -996,7 +1251,18 @@ const App = (() => {
     }
   }
 
-  function startBattle(firstPlayer) {
+  async function startBattle(firstPlayer) {
+    // Show loading while sprites resolve
+    showLoading('Summoning Pokémon...');
+
+    // Preload animated sprites for both teams
+    await Promise.all([
+      SpriteResolver.preloadTeam(p1Team),
+      SpriteResolver.preloadTeam(p2Team)
+    ]);
+
+    hideLoading();
+
     const battle = BattleEngine.initBattle(p1Team, p2Team, selectedMode);
     if (firstPlayer) battle.turn = firstPlayer;
 
@@ -1031,37 +1297,99 @@ const App = (() => {
     const playerPoke = BattleEngine.getActive(playerNum);
     const oppPoke = BattleEngine.getActive(oppNum);
 
-    // Player side
+    // Player side — show BACK sprite (your Pokémon faces away)
     if (playerPoke) {
       document.getElementById('player-name').textContent = playerPoke.name;
-      document.getElementById('player-sprite-img').src = playerPoke.images.large || playerPoke.images.small;
+
+      const playerImg = document.getElementById('player-sprite-img');
+      const sprites = SpriteResolver.getSpritesCached(playerPoke);
+      if (sprites && sprites.resolved) {
+        playerImg.src = sprites.back;
+        playerImg.classList.add('animated-sprite');
+        // Fallback to static if GIF fails
+        playerImg.onerror = function() {
+          this.src = sprites.backStatic;
+          this.onerror = function() {
+            this.src = playerPoke.images.large || playerPoke.images.small;
+            this.classList.remove('animated-sprite');
+          };
+        };
+      } else {
+        playerImg.src = playerPoke.images.large || playerPoke.images.small;
+        playerImg.classList.remove('animated-sprite');
+      }
+
       updateHPDisplay('player', playerPoke);
       renderEnergy(playerPoke);
       renderStatus('player', playerPoke);
       renderBadge('player', playerPoke);
     }
 
-    // Opponent side
+    // Opponent side — show FRONT sprite (opponent faces you)
     if (oppPoke) {
       document.getElementById('opp-name').textContent = oppPoke.name;
-      document.getElementById('opp-sprite-img').src = oppPoke.images.large || oppPoke.images.small;
+
+      const oppImg = document.getElementById('opp-sprite-img');
+      const sprites = SpriteResolver.getSpritesCached(oppPoke);
+      if (sprites && sprites.resolved) {
+        oppImg.src = sprites.front;
+        oppImg.classList.add('animated-sprite');
+        oppImg.onerror = function() {
+          this.src = sprites.frontStatic;
+          this.onerror = function() {
+            this.src = oppPoke.images.large || oppPoke.images.small;
+            this.classList.remove('animated-sprite');
+          };
+        };
+      } else {
+        oppImg.src = oppPoke.images.large || oppPoke.images.small;
+        oppImg.classList.remove('animated-sprite');
+      }
+
       updateHPDisplay('opp', oppPoke);
       renderStatus('opp', oppPoke);
       renderBadge('opp', oppPoke);
     }
   }
 
+  // Track previous HP percentages for the lag bar
+  let prevHpPct = { player: 100, opp: 100 };
+
   function updateHPDisplay(prefix, pokemon) {
     const bar = document.getElementById(`${prefix}-hp-bar`);
+    const lag = document.getElementById(`${prefix}-hp-lag`);
     const text = document.getElementById(`${prefix}-hp-text`);
     const pct = Math.max(0, (pokemon.currentHp / pokemon.maxHp) * 100);
+    const prevPct = prevHpPct[prefix] || 100;
+
+    // Set the lag bar to the PREVIOUS width first (it will animate down with delay)
+    if (lag) {
+      // Only update lag if HP went DOWN
+      if (pct < prevPct) {
+        lag.style.width = prevPct + '%';
+        // Force reflow to ensure transition triggers from previous value
+        void lag.offsetWidth;
+        lag.style.width = pct + '%';
+      } else {
+        lag.style.width = pct + '%';
+      }
+    }
 
     bar.style.width = pct + '%';
     bar.className = 'hp-bar-fill';
-    if (pct <= 25) bar.classList.add('red');
-    else if (pct <= 50) bar.classList.add('yellow');
+    if (pct <= 25) {
+      bar.classList.add('red');
+      // Critical flash when HP drops into red zone and it just changed
+      if (prevPct > 25 && pct <= 25) {
+        bar.classList.add('critical');
+        setTimeout(() => bar.classList.remove('critical'), 1200);
+      }
+    } else if (pct <= 50) {
+      bar.classList.add('yellow');
+    }
 
     text.textContent = `${Math.max(0, pokemon.currentHp)}/${pokemon.maxHp}`;
+    prevHpPct[prefix] = pct;
   }
 
   function renderEnergy(pokemon) {
@@ -1318,9 +1646,23 @@ const App = (() => {
     }, 200);
 
     setTimeout(() => {
-      // Flash
+      const attackerPoke = BattleEngine.getActive(BattleEngine.getCurrentPlayer());
+
+      // Flash — type-tinted for super effective
       const flash = document.getElementById('attack-flash');
-      flash.className = 'attack-flash ' + (result.effective === 'super' ? 'super-flash' : 'flash');
+      if (result.effective === 'super') {
+        const attackType = (result.attack && result.attack.cost && result.attack.cost[0]) || (attackerPoke && attackerPoke.primaryType) || 'Colorless';
+        flash.style.background = PokemonAPI.getTypeColor(attackType);
+        flash.className = 'attack-flash type-tint';
+      } else {
+        flash.style.background = '#fff';
+        flash.className = 'attack-flash flash';
+      }
+
+      // Spawn per-type attack particles at the opponent sprite
+      if (attackerPoke) {
+        spawnAttackParticles(attackerPoke.primaryType || 'Colorless', 'opp');
+      }
 
       // Hit shake
       animateSprite('opp', 'hit-shake');
@@ -1450,6 +1792,78 @@ const App = (() => {
     sprite.classList.add(animClass);
     setTimeout(() => sprite.classList.remove(animClass), 1000);
   }
+
+  // ─── Per-Type Attack Particles ───
+  function spawnAttackParticles(type, targetPrefix) {
+    const container = document.getElementById('attack-particles');
+    if (!container) return;
+
+    // Get approximate target position (opponent sprite area)
+    const targetSprite = document.getElementById(`${targetPrefix}-sprite`);
+    if (!targetSprite) return;
+
+    const arenaRect = container.getBoundingClientRect();
+    const targetRect = targetSprite.getBoundingClientRect();
+
+    // Center of target sprite relative to the particle container
+    const cx = targetRect.left - arenaRect.left + targetRect.width / 2;
+    const cy = targetRect.top - arenaRect.top + targetRect.height / 2;
+
+    const typeLower = (type || 'colorless').toLowerCase();
+    const config = PARTICLE_CONFIGS[typeLower] || PARTICLE_CONFIGS['colorless'];
+
+    for (let i = 0; i < config.count; i++) {
+      const particle = document.createElement('div');
+      particle.className = `atk-particle ${typeLower}`;
+
+      // Position relative to target with some randomness
+      const offsetX = (Math.random() - 0.5) * config.spread;
+      const offsetY = (Math.random() - 0.5) * config.spread;
+      const x0 = cx + offsetX;
+      const y0 = cy + offsetY;
+
+      // End position (where particle flies to)
+      const x1 = x0 + (Math.random() - 0.5) * config.travel;
+      const y1 = y0 + (Math.random() - 0.5) * config.travel + (config.gravity || 0);
+
+      particle.style.left = '0px';
+      particle.style.top = '0px';
+      particle.style.setProperty('--x0', x0 + 'px');
+      particle.style.setProperty('--y0', y0 + 'px');
+      particle.style.setProperty('--x1', x1 + 'px');
+      particle.style.setProperty('--y1', y1 + 'px');
+      particle.style.setProperty('--duration', (config.duration + Math.random() * config.durationVariance) + 's');
+
+      if (config.rotation) {
+        particle.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+      }
+
+      // Stagger spawn
+      particle.style.animationDelay = (i * config.stagger) + 's';
+
+      container.appendChild(particle);
+
+      // Clean up after animation
+      setTimeout(() => {
+        particle.remove();
+      }, (config.duration + config.durationVariance + i * config.stagger) * 1000 + 200);
+    }
+  }
+
+  // Particle configuration per type
+  const PARTICLE_CONFIGS = {
+    fire: { count: 18, spread: 60, travel: 100, gravity: -60, duration: 0.6, durationVariance: 0.4, stagger: 0.03, rotation: false },
+    water: { count: 14, spread: 80, travel: 60, gravity: 40, duration: 0.7, durationVariance: 0.3, stagger: 0.04, rotation: false },
+    lightning: { count: 8, spread: 100, travel: 20, gravity: 0, duration: 0.2, durationVariance: 0.2, stagger: 0.06, rotation: true },
+    psychic: { count: 4, spread: 30, travel: 10, gravity: 0, duration: 0.8, durationVariance: 0.3, stagger: 0.15, rotation: false },
+    fighting: { count: 10, spread: 50, travel: 80, gravity: 0, duration: 0.4, durationVariance: 0.3, stagger: 0.04, rotation: false },
+    grass: { count: 12, spread: 100, travel: 120, gravity: 50, duration: 1.0, durationVariance: 0.4, stagger: 0.05, rotation: true },
+    darkness: { count: 8, spread: 50, travel: 30, gravity: 0, duration: 0.5, durationVariance: 0.3, stagger: 0.06, rotation: false },
+    metal: { count: 16, spread: 60, travel: 100, gravity: -20, duration: 0.3, durationVariance: 0.2, stagger: 0.02, rotation: false },
+    dragon: { count: 12, spread: 70, travel: 90, gravity: -30, duration: 0.6, durationVariance: 0.3, stagger: 0.04, rotation: false },
+    fairy: { count: 14, spread: 80, travel: 70, gravity: -40, duration: 0.8, durationVariance: 0.3, stagger: 0.05, rotation: false },
+    colorless: { count: 10, spread: 60, travel: 80, gravity: 0, duration: 0.5, durationVariance: 0.3, stagger: 0.04, rotation: false },
+  };
 
   function showTurnIndicator() {
     const state = BattleEngine.getState();
